@@ -1,10 +1,11 @@
-#!/usr/local/bin/ruby
+#!/usr/local/bin/ruby -Ku
 # encoding: utf-8
 
 require 'logger'
-require "rss"
-require "time"
+require 'rss'
+require 'time'
 require 'twitter'
+require 'cgi'
 
 #logger
 @@log = Logger.new('/var/log/oss_info.log','monthly')
@@ -66,13 +67,15 @@ def print_items(feed)
         a_title[i] << '...  '
       end
       
-      #TODO
       #&amp;,&lt;,&gt;を&,<,>に変換する
-      tweet_str = "#{a_title[i]} : #{a_link[i]}: #{stime}更新 #{@@hashtag} "
+      tweet_str = CGI.unescapeHTML("#{a_title[i]} : #{a_link[i]}: #{stime}更新 #{@@hashtag} ")
 
       begin
-        tweet(tweet_str)
-        @@log.info(tweet_str)
+	#*(アスタリスク)で始まる更新はtweetしない
+        if /^\*/ !~ tweet_str
+          tweet(tweet_str)
+          @@log.info(tweet_str)
+	end
         #1回の起動で1tweetのみ実行
         f.write a_published[i] + "\n"
         break
