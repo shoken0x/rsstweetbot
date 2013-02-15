@@ -13,7 +13,7 @@ require 'cgi'
 @@log.level = Logger::INFO
 
 ENV["TZ"] = "Asia/Tokyo"
-url = ""
+url = ''
 @@hashtag = ''
 
 
@@ -74,7 +74,7 @@ def print_items(feed)
 	#*(アスタリスク)で始まる更新はtweetしない
         if /^\*/ !~ tweet_str
           tweet(tweet_str)
-          @@log.info(tweet_str)
+          @@log.info(a_published[i] + tweet_str)
 	end
         #1回の起動で1tweetのみ実行
         f.write a_published[i] + "\n"
