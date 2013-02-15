@@ -4,122 +4,79 @@
 require 'logger'
 require 'rss'
 require 'time'
-require 'twitter'
 require 'cgi'
+require 'rbatch'
 
-#logger
-@@log = Logger.new('/var/log/oss_info.log','monthly')
-#@@log = Logger.new(STDOUT)
-@@log.level = Logger::INFO
+gem "twitter","2.2.0"
+require 'twitter'
 
-ENV["TZ"] = "Asia/Tokyo"
-url = ''
-@@hashtag = ''
+RBatch::Log.new do |log|
 
-
-def print_items(feed)
-  lastupdate = ""
-  f = open("/root/src/ruby/lastupdate", "r+")
-  f.each {|line| lastupdate = line}
+  ENV["TZ"]  = RBatch::config["timezone"]
+  url        = RBatch::config["rss_url"]
+  hashtag    = RBatch::config["twitter"]["hashtag"]
+  lastupdate = "2000-01-01T00:00:00Z"
   
-  if feed.instance_of?(RSS::Atom::Feed)
-    title = Array.new
-    published = Array.new
-    link = Array.new
-
-    #feed.itemsをpublishedでsort
-    feed.items.sort! {|a,b|
-      Time.parse(a.published.to_s) <=> Time.parse(b.published.to_s)
-    }
-
-    feed.items.each do |item|
-      if(Time.parse(item.published.to_s) > Time.parse(lastupdate))
-        title << item.title.to_s
-        published << item.published.to_s
-        link << item.link.to_s.gsub(/<link href="/,'').gsub(/".*/m,'')
-      end
-    end 
-    
-    a_title = get_xml_cont(title)
-    a_published = get_xml_cont(published)
-    a_link = link
-
-    title.size.times do |i| 
-      t = Time.parse(a_published[i])
-      stime = t.strftime("%Y年%m月%d日")
-
-      # urlに40文字,更新日付に15文字,ハッシュタグに30文字確保、タイトルが50文字以上だったらカットする
-      cut_num = 50
-
+  feed = RSS::Parser.parse(url)
+  file = open(RBatch::config["lastupdate_file"], "r+")
+  # 最後の行をlastupdateに格納
+  file.each {|line| lastupdate = line}
+  
+  if ! feed.instance_of?(RSS::Atom::Feed)
+    puts "this is not instance of RSS::Atom::Feed"
+    exit 1
+  end
+  
+  #feed.itemsをpublishedでsort
+  feed.items.sort! {|a,b|
+    Time.parse(a.published.to_s) <=> Time.parse(b.published.to_s)
+  }
+  
+  tweets = []
+  feed.items.each do |item|
+    if(Time.parse(item.published.to_s) > Time.parse(lastupdate))
+      tweets << { 
+        :title => item.title.to_s.gsub("<title>","").gsub("</title>",""),
+        :published => item.published.to_s.gsub("<published>","").gsub("</published>",""),
+        :link => item.link.to_s.gsub(/<link href="/,'').gsub(/".*/m,'')
+      }
+    end
+  end
+  
+  tweets.each do |tw|
+    next if /^\*/ =~ tw[:title]  #*(アスタリスク)で始まる更新はtweetしない
+    stime = Time.parse(tw[:published]).strftime("%Y年%m月%d日")
+    # urlに40文字,更新日付に15文字,ハッシュタグに30文字確保、
+    cut_num = 50
+    if (tw[:title].include?('OpenAM'))
       #titleにOpenAMが入っていたらハッシュタグに#openam_jpを追加
-      if (a_title[i].include?('OpenAM'))
-        @@hashtag << ' #openam_jp'
-        cut_num = 40
+      hashtag = hashtag + ' #openam_jp'
+      cut_num = 40
+    end
+    # タイトルがcut_num以上だったら...にする
+    if (tw[:title].size > cut_num)
+      tw[:title] = tw[:title].split(//).first(cut_num - 5).inject("") do |result, char|
+        result += char
       end
-
-      if (a_title[i].size > cut_num)
-        a_title[i] = slice_by_length(a_title[i], cut_num - 5)
-        a_title[i] << '...  '
+      tw[:title] << '...  '
+    end
+    #&amp;,&lt;,&gt;を&,<,>に変換する
+    tweet_str = CGI.unescapeHTML("#{tw[:title]} : #{tw[:link]}: #{stime}更新 #{hashtag} ")
+    begin
+      Twitter.configure do |config|
+        config.consumer_key       = RBatch::config["twitter"]["consumer_key"]
+        config.consumer_secret    = RBatch::config["twitter"]["consumer_secret"]
+        config.oauth_token        = RBatch::config["twitter"]["oauth_token"]
+        config.oauth_token_secret = RBatch::config["twitter"]["oauth_token_secret"]
       end
-      
-      #&amp;,&lt;,&gt;を&,<,>に変換する
-      tweet_str = CGI.unescapeHTML("#{a_title[i]} : #{a_link[i]}: #{stime}更新 #{@@hashtag} ")
-
-      begin
-	#*(アスタリスク)で始まる更新はtweetしない
-        if /^\*/ !~ tweet_str
-          tweet(tweet_str)
-          @@log.info(a_published[i] + tweet_str)
-	end
-        #1回の起動で1tweetのみ実行
-        f.write a_published[i] + "\n"
-        break
-      rescue Exception => e
-        @@log.error(e)
-      end
-    end 
-  end
-  # 現在はAtom Feedのみ対応 
-  # RSSとRDFはコメントアウト
-  #elsif feed.instance_of?(RSS::Rss)
-  #  feed.items.each do |item|
-  #    puts "#{item.title} : #{item.pubDate.strftime("%Y-%m-%d %H:%M:%S")}"
-  #  end 
-  #elsif feed.instance_of?(RSS::RDF)
-  #  feed.items.each do |item|
-  #    puts "#{item.title} : #{item.date.strftime("%Y-%m-%d %H:%M:%S")}"
-  #  end 
-  #end 
-  f.close
+      Twitter.update(tweet_str)
+      log.info(tw[:published] + tweet_str)
+      #ツイートできた更新の時刻を書き込む
+      file.write tw[:published] + "\n"
+      break # 一回つぶやいたら終わり
+    rescue Exception => e
+      log.error(e)
+    end # end begin
+  end # end title.times
+  file.close
 end
-
-def slice_by_length(str, str_length)
-  str.split(//).first(str_length).inject("") do |result, char|
-    result += char
-  end
-end
-
-def get_xml_cont(arr)
-  ret = Array.new
-  arr.each do |elem|
-    %r|<.+>(.*)</.+>| =~ elem
-    ret << $1
-  end
-  ret
-end
-
-def tweet(str)
-  Twitter.configure do |config|
-    #oss_info
-    config.consumer_key = ''
-    config.consumer_secret = ''
-    config.oauth_token = ''
-    config.oauth_token_secret = ''
-  end
-  Twitter.update( str )
-end
-
-rss = RSS::Parser.parse(url)
-print_items(rss)
-
-

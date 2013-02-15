@@ -1,0 +1,9 @@
+timezone : "Asia/Tokyo"
+rss_url : "http://openstandia.jp/oss_info/atom.xml"
+lastupdate_file : "/tmp/lastupdate.txt"
+twitter:
+  hashtag : "#OSS_INFO #OpenSource #OSS"
+  consumer_key : "UOfnZ5tZ9H0r5FJafrySkw" 
+  consumer_secret : "ekdK8srIC5KXZvd8Wpu4ymZrdrK87hpgqT57Aikc"
+  oauth_token : "1183126368-pv8M4p9z19g4w7U3fwJ8k3qGIpyieK1UFfYWnjV"
+  oauth_token_secret : "JVcgutnKMt4rl2dZfQ6zsVYF3h4F6hvosdNi0SkmcAs"
