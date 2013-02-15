@@ -48,11 +48,6 @@ def print_items(feed)
       t = Time.parse(a_published[i])
       stime = t.strftime("%Y年%m月%d日")
 
-      #test
-      #a_title[i] = 'urlに40文字,更新日付に15文字,ハッシュタグに30文字確保、タイトルが50文字以上だったらカットする'
-      #a_link[i] = 'http://example.com'
-      #stime = ''
-
       # urlに40文字,更新日付に15文字,ハッシュタグに30文字確保、タイトルが50文字以上だったらカットする
       cut_num = 50
 
@@ -83,15 +78,9 @@ def print_items(feed)
         @@log.error(e)
       end
     end 
-
-    #最新記事のpublishedをファイルへ保存
-#    if(a_published.size > 0)
-#      a_published.sort!
-#      a_published.reverse!
-#      f.write a_published[0] + "\n"
-#    end
-
   end
+  # 現在はAtom Feedのみ対応 
+  # RSSとRDFはコメントアウト
   #elsif feed.instance_of?(RSS::Rss)
   #  feed.items.each do |item|
   #    puts "#{item.title} : #{item.pubDate.strftime("%Y-%m-%d %H:%M:%S")}"
