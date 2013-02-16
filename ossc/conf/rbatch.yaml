@@ -42,7 +42,7 @@
 #   <host> --> Replace to Hostname.
 #
 #log_name : "<date>_<time>_<prog>.log"
-#log_name : "<date>_<prog>.log"
+log_name : "<date>_<prog>.log"
 
 # Log Output Directory
 #
@@ -82,7 +82,7 @@
 #   A log file to delete is a log file which was made by the RBatch::Log instance, 
 #   and log filename format include "<date>".
 #
-#log_delete_old_log: true
+log_delete_old_log: true
 #log_delete_old_log: false
 
 # The day of leaving log files
